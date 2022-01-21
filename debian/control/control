@@ -1,0 +1,9 @@
+Package: [[name]]
+Version: [[version]]
+Section: misc
+Priority: optional
+Architecture: all
+Depends:
+Recommends: openjdk-11-jdk
+Description: Disthene remover
+Maintainer: Andrei Ivanov
