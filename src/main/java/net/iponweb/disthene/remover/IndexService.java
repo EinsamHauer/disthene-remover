@@ -45,9 +45,9 @@ public class IndexService {
                 .size(10_000)
                 .query(
                         QueryBuilders.boolQuery()
-                                .must(QueryBuilders.termQuery("tenant", tenant))
-                                .must(QueryBuilders.termQuery("leaf", true))
                                 .must(QueryBuilders.regexpQuery("path.keyword", regEx))
+                                .filter(QueryBuilders.termQuery("tenant.keyword", tenant))
+                                .filter(QueryBuilders.termQuery("leaf", true))
                 );
 
         SearchRequest request = new SearchRequest(INDEX_NAME)
@@ -77,9 +77,10 @@ public class IndexService {
 
         DeleteByQueryRequest deleteByQueryRequest = new DeleteByQueryRequest(INDEX_NAME)
                 .setQuery(QueryBuilders.boolQuery()
-                        .must(QueryBuilders.termQuery("tenant", tenant))
-                        .must(QueryBuilders.termQuery("leaf", true))
-                        .must(QueryBuilders.regexpQuery("path.keyword", regEx)))
+                        .must(QueryBuilders.regexpQuery("path.keyword", regEx))
+                        .filter(QueryBuilders.termQuery("tenant.keyword", tenant))
+                        .filter(QueryBuilders.termQuery("leaf", true))
+                )
                 .setScroll(TimeValue.timeValueHours(4L))
                 .setTimeout(TimeValue.timeValueHours(4L));
 

@@ -10,6 +10,7 @@ import org.apache.logging.log4j.core.config.builder.impl.BuiltConfiguration;
 
 import java.io.IOException;
 import java.util.Scanner;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class DistheneRemover {
 
@@ -59,25 +60,33 @@ public class DistheneRemover {
                 }
             }
 
-        } catch (ParseException e) {
+        } catch (ParseException | MissingOptionsException e) {
             System.out.println(e.getMessage());
             printHelp(options);
+            System.exit(1);
         }
 
         System.exit(0);
     }
 
-    private static void deleteMetrics(CommandLine commandLine) throws IOException {
+    private static void deleteMetrics(CommandLine commandLine) throws IOException, MissingOptionsException {
         if (!commandLine.hasOption("c") || !commandLine.hasOption("e") || !commandLine.hasOption("w") || !commandLine.hasOption("t")) {
             System.out.println("One or more of the required [c, e, w, t] options are not specified");
-            return;
+            throw new MissingOptionsException("One or more of the required [c, e, w, t] options are not specified");
         }
 
         IndexService indexService = new IndexService(commandLine.getOptionValue("e"), commandLine.getOptionValue("t"));
 
+        AtomicLong counter = new AtomicLong();
+
         if (commandLine.hasOption("dr")) {
             logger.info("Will delete the following metrics:");
-            indexService.process(commandLine.getOptionValue("w"), System.out::println);
+            indexService.process(commandLine.getOptionValue("w"), metric -> {
+                counter.getAndIncrement();
+                System.out.println(metric);
+            });
+
+            logger.info("Found " + counter.get() + " metrics");
         } else {
             Scanner sc= new Scanner(System.in);
             System.out.print(ANSI_RED + "You are about to irrevocably delete metrics with wildcard \"" + commandLine.getOptionValue("w") + "\" from tenant " + commandLine.getOptionValue("t") + ". Are you sure? (Expected answer: \"Yes, I am\"): " + ANSI_RESET);
@@ -90,20 +99,26 @@ public class DistheneRemover {
 
             CassandraService cassandraService = new CassandraService(commandLine.getOptionValue("c"), commandLine.getOptionValue("t"));
 
-            indexService.process(commandLine.getOptionValue("w"), cassandraService::deleteMetric);
+            indexService.process(commandLine.getOptionValue("w"), metric -> {
+                cassandraService.deleteMetric(metric);
+                counter.getAndIncrement();
+            });
             indexService.deleteByWildCard(commandLine.getOptionValue("w"));
 
             cassandraService.close();
+
+            logger.info("Deleted " + counter.get() + " metrics");
         }
 
         indexService.close();
+
         logger.info("All done");
     }
 
-    private static void removeTenant(CommandLine commandLine) throws IOException {
+    private static void removeTenant(CommandLine commandLine) throws IOException, MissingOptionsException {
         if (!commandLine.hasOption("c") || !commandLine.hasOption("e") || !commandLine.hasOption("t")) {
             System.out.println("One or more of the required [c, e, t] options are not specified");
-            System.out.println("About to remove tenant " + commandLine.getOptionValue("t"));
+            throw new MissingOptionsException("One or more of the required [c, e, t] options are not specified");
         }
 
         Scanner sc= new Scanner(System.in);
